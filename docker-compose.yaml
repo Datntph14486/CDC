@@ -1,0 +1,76 @@
+version: '2'
+services:
+  zookeeper:
+    container_name: zookeeper
+    hostname: zookeeper
+    image: quay.io/debezium/zookeeper:${DEBEZIUM_VERSION}
+    ports:
+     - 2181:2181
+     - 2888:2888
+     - 3888:3888
+    volumes: 
+      - zoo-data:/zookeeper/data
+    networks:
+      - sync_debezium_network
+  kafka:  
+    container_name: kafka
+    hostname: kafka
+    image: quay.io/debezium/kafka:${DEBEZIUM_VERSION}
+    ports:
+     - 9092:9092
+    depends_on:
+     - zookeeper
+    environment:
+     - ZOOKEEPER_CONNECT=zookeeper:2181
+     - KAFKA_LISTENERS=INTERNAL://kafka:29092,EXTERNAL://0.0.0.0:9092
+     - KAFKA_ADVERTISED_LISTENERS=INTERNAL://kafka:29092,EXTERNAL://${IP_CONFIG_COMPUTER}:9092
+     - KAFKA_LISTENER_SECURITY_PROTOCOL_MAP=INTERNAL:PLAINTEXT,EXTERNAL:SASL_PLAINTEXT
+     - KAFKA_INTER_BROKER_LISTENER_NAME=INTERNAL
+     - KAFKA_SASL_ENABLED_MECHANISMS=PLAIN
+     - KAFKA_SASL_MECHANISM_INTER_BROKER_PROTOCOL=PLAIN
+     - KAFKA_AUTHORIZER_CLASS_NAME=kafka.security.auth.SimpleAclAuthorizer
+     - KAFKA_ALLOW_EVERYONE_IF_NO_ACL_FOUND=false
+     - KAFKA_SUPER_USERS=User:admin
+     - KAFKA_OPTS=-Djava.security.auth.login.config=/opt/kafka/config/kafka_server_jaas.conf
+     - KAFKA_LOG_RETENTION_MS=86400000
+    volumes: 
+      - kafka-data:/kafka/data
+      - ./kafka_server_jaas.conf:/opt/kafka/config/kafka_server_jaas.conf
+    networks:
+      - sync_debezium_network
+  kafka-connect:
+    container_name: kafka-connect
+    image: quay.io/debezium/connect:${DEBEZIUM_VERSION}
+    ports:
+     - 8083:8083
+    depends_on:
+     - kafka
+    environment:
+     - BOOTSTRAP_SERVERS=kafka:29092
+     - GROUP_ID=1
+     - CONFIG_STORAGE_TOPIC=debezium_configs
+     - OFFSET_STORAGE_TOPIC=debezium_offsets
+     - STATUS_STORAGE_TOPIC=debezium_statuses
+     - OFFSET_STORAGE_REPLICATION_FACTOR=1
+     - OFFSET_STORAGE_PARTITIONS=1
+    networks:
+      - sync_debezium_network
+  kafka-ui:
+    container_name: kafka-ui
+    image: provectuslabs/kafka-ui:latest
+    ports:
+      - "8080:8080"
+    environment:
+      KAFKA_CLUSTERS_0_NAME: local
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092
+      auth.type: LOGIN_FORM
+      SPRING_SECURITY_USER_NAME: ${SPRING_SECURITY_USER_NAME}
+      SPRING_SECURITY_USER_PASSWORD: ${SPRING_SECURITY_USER_PASSWORD}
+    networks:
+      - sync_debezium_network
+networks:
+  sync_debezium_network:
+    driver: bridge
+volumes: 
+  kafka-data:
+  zoo-data:
