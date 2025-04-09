@@ -24,18 +24,13 @@ services:
      - ZOOKEEPER_CONNECT=zookeeper:2181
      - KAFKA_LISTENERS=INTERNAL://kafka:29092,EXTERNAL://0.0.0.0:9092
      - KAFKA_ADVERTISED_LISTENERS=INTERNAL://kafka:29092,EXTERNAL://${IP_CONFIG_COMPUTER}:9092
-     - KAFKA_LISTENER_SECURITY_PROTOCOL_MAP=INTERNAL:PLAINTEXT,EXTERNAL:SASL_PLAINTEXT
+     - KAFKA_LISTENER_SECURITY_PROTOCOL_MAP=INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT
      - KAFKA_INTER_BROKER_LISTENER_NAME=INTERNAL
-     - KAFKA_SASL_ENABLED_MECHANISMS=PLAIN
-     - KAFKA_SASL_MECHANISM_INTER_BROKER_PROTOCOL=PLAIN
-     - KAFKA_AUTHORIZER_CLASS_NAME=kafka.security.auth.SimpleAclAuthorizer
-     - KAFKA_ALLOW_EVERYONE_IF_NO_ACL_FOUND=false
-     - KAFKA_SUPER_USERS=User:admin
-     - KAFKA_OPTS=-Djava.security.auth.login.config=/opt/kafka/config/kafka_server_jaas.conf
-     - KAFKA_LOG_RETENTION_MS=86400000
+     - KAFKA_LOG_RETENTION_MS=259200000 # 3 days
+     - KAFKA_SEGMENT_INDEX_BYTES=104857600 # Xác định kích thước tối đa của chỉ mục segment log trên Kafka broker
+     - KAFKA_MESSAGE_MAX_BYTES=20971520 # Xác định kích thước tối đa của một message có thể được Kafka broker chấp nhận
     volumes: 
       - kafka-data:/kafka/data
-      - ./kafka_server_jaas.conf:/opt/kafka/config/kafka_server_jaas.conf
     networks:
       - sync_debezium_network
   kafka-connect:
@@ -53,6 +48,12 @@ services:
      - STATUS_STORAGE_TOPIC=debezium_statuses
      - OFFSET_STORAGE_REPLICATION_FACTOR=1
      - OFFSET_STORAGE_PARTITIONS=1
+
+     - CONNECT_PRODUCER_MAX_REQUEST_SIZE=5242880 # Giới hạn kích thước tối đa của một request gửi từ Kafka Producer (Debezium Connect)
+     - CONNECT_CONSUMER_FETCH_MAX_BYTES=5242880 # Xác định kích thước tối đa của một lần fetch từ Kafka Consumer (Debezium Connect).
+     - CONNECT_MAX_BATCH_SIZE=500 # Số lượng bản ghi tối đa mà Debezium có thể xử lý trong một batch trước khi gửi sang Kafka.
+     - CONNECT_MAX_QUEUE_SIZE=1000 # Giới hạn số lượng bản ghi tối đa trong queue trước khi chúng được gửi từ Debezium sang Kafka.
+     - CONNECT_MAX_REQUEST_SIZE=5242880 # Giới hạn kích thước tối đa của một request từ Kafka Connect gửi sang Kafka Broker.
     networks:
       - sync_debezium_network
   kafka-ui:
